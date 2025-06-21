@@ -1,0 +1,224 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ghostchecker",
+        "options": {}
+      },
+      "name": "Transcript Input",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -580,
+        80
+      ],
+      "id": "4ba30fa1-b2e2-4245-a90c-f1f46ce696fa",
+      "webhookId": "e4faacf4-a678-46a2-894b-24a27924337d"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nreturn [{\n  json: {\n    transcript: $json.body.text || $json.body.transcript || \"No transcript found.\"\n  }\n}];\n"
+      },
+      "name": "Parse Transcript",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        80
+      ],
+      "id": "c6b22524-9fa9-49c9-bf7d-fa7282554aef"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "prompt",
+              "value": "You are GhostChecker AI. Given a transcript of an online meeting, classify each participant as:\n\n✅ Present – actively participated  \n⏰ Late – joined mid-way but contributed  \n👻 Ghost – logged in but said nothing  \n❌ Absent – never appeared\n\nReturn in JSON like:\n{\n  \"Name A\": \"✅ Present\",\n  \"Name B\": \"👻 Ghost\"\n}\n\nTranscript:\n{{$json[\"transcript\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        80
+      ],
+      "id": "fa526698-c607-4b53-9b0a-c1b259600528"
+    },
+    {
+      "parameters": {
+        "url": "https://mindcraft-kapidhwaj-openai-api-key.openai.azure.com/openai/deployments/mindcraft-gpt4o/chat/completions?api-version=2024-12-01-preview",
+        "options": {}
+      },
+      "name": "Call GPT-4o",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        80,
+        80
+      ],
+      "id": "73484556-c265-4013-ae56-dce4bdc4475b"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst gptText = $json.choices[0].message.content;\nconst attendanceData = JSON.parse(gptText);\nreturn Object.entries(attendanceData).map(([name, status]) => {\n  return { json: { name, status } };\n});\n"
+      },
+      "name": "Extract Classification",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        280,
+        80
+      ],
+      "id": "868fa103-9daf-4aa8-941e-ab02ed52ef5b"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "sheetId": "1nboTb5IT-saeE8o5M-23mzHGyZFGDcR87VSIHOQkbZk",
+        "range": "Sheet1!A:C",
+        "keyRow": null,
+        "options": {
+          "usePathForKeyRow": true,
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "name": "Log Attendance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        740,
+        80
+      ],
+      "id": "55ce0152-6fa8-4a6b-ab09-dc9720954290",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HVUjfhe6nhNPCkV6",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return $items().map(item => {\n  return {\n    json: {\n      Name: item.json.name,\n      Status: item.json.status,\n      Timestamp: new Date().toLocaleString()\n    }\n  }\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        80
+      ],
+      "id": "55a454e6-b8ed-4830-b375-e1aa004efd5d",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "path": "a8a62df1-db7d-425c-b5e1-995edbd72e9f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        386.41509433962267,
+        80
+      ],
+      "id": "abdb57ee-88bc-41a8-859c-b5980b889a2b",
+      "name": "Webhook",
+      "webhookId": "a8a62df1-db7d-425c-b5e1-995edbd72e9f"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Transcript Input": {
+      "main": [
+        [
+          {
+            "node": "Parse Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Transcript": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call GPT-4o",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call GPT-4o": {
+      "main": [
+        [
+          {
+            "node": "Extract Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Classification": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Log Attendance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "errorWorkflow": "JI1EEW8EekcsDhGC"
+  },
+  "versionId": "9b4b5cee-e1cc-456c-bb0f-d21ebd05a38d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7dce3c3351889ae4d49a3219d42a6a56427231566ce31b84eb9bb6de37755826"
+  },
+  "id": "JI1EEW8EekcsDhGC",
+  "tags": []
+}
